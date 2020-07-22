@@ -1,0 +1,105 @@
+/* Q1: Some of the facilities charge a fee to members, but some do not.
+Please list the names of the facilities that do. */
+Tennis Court 1
+Tennis Court 2
+Massage Room 1
+Massage Room 2
+Squash Court
+
+/* Q2: How many facilities do not charge a fee to members? */
+4
+
+/* Q3: How can you produce a list of facilities that charge a fee to members,
+where the fee is less than 20% of the facility's monthly maintenance cost?
+Return the facid, facility name, member cost, and monthly maintenance of the
+facilities in question. */
+SELECT facid, name AS facility_name, membercost AS memeber_cost, monthlymaintenance AS monthly_maintenance_cost
+FROM Facilities
+WHERE membercost >0
+AND membercost < ( monthlymaintenance * 0.2 )
+
+/* Q4: How can you retrieve the details of facilities with ID 1 and 5?
+Write the query without using the OR operator. */
+SELECT *
+FROM Facilities
+WHERE facid IN ( 1, 5 )
+
+/* Q5: How can you produce a list of facilities, with each labelled as
+'cheap' or 'expensive', depending on if their monthly maintenance cost is
+more than $100? Return the name and monthly maintenance of the facilities
+in question. */
+SELECT name, 
+(CASE WHEN monthlymaintenance <=100
+THEN 'cheap' ELSE 'expensive' END) AS mthlymaintenance
+FROM Facilities
+GROUP BY 1
+
+/* Q6: You'd like to get the first and last name of the last member(s)
+who signed up. Do not use the LIMIT clause for your solution. */
+SELECT surname,
+	   firstname,
+	   max(joindate)
+	FROM Members
+	WHERE Members.memid != 0
+
+/* Q7: How can you produce a list of all members who have used a tennis court?
+Include in your output the name of the court, and the name of the member
+formatted as a single column. Ensure no duplicate data, and order by
+the member name. */
+SELECT DISTINCT b.bookid, CONCAT( m.firstname, " ", m.surname ) AS member_fullname, f.name AS tennis_court_name
+FROM Bookings b
+INNER JOIN Members m ON b.memid = m.memid
+INNER JOIN Facilities f ON b.facid = f.facid
+WHERE f.facid IN ( 0, 1 )
+AND m.memid !=0
+ORDER BY 2 
+
+/* Q8: How can you produce a list of bookings on the day of 2012-09-14 which
+will cost the member (or guest) more than $30? Remember that guests have
+different costs to members (the listed costs are per half-hour 'slot'), and
+the guest user's ID is always 0. Include in your output the name of the
+facility, the name of the member formatted as a single column, and the cost.
+Order by descending cost, and do not use any subqueries. */
+SELECT CONCAT( m.firstname, " ", m.surname ) AS member_fullname,
+		f.name AS facility_name,
+		CASE WHEN b.memid!=0 THEN membercost*slots
+		ELSE guestcost*slots END AS booking_costs
+FROM Bookings b
+INNER JOIN Members m ON b.memid = m.memid
+INNER JOIN Facilities f ON b.facid = f.facid
+WHERE starttime between '2012-09-14 00:00' and '2012-09-14 11:59'
+AND (((membercost*slots)>30 AND b.memid!=0)
+     or((guestcost*slots)>30 AND b.memid=0))
+ORDER BY 3 DESC
+
+/* Q9: This time, produce the same result as in Q8, but using a subquery. */
+SELECT bc.* FROM
+(SELECT CONCAT( m.firstname, " ", m.surname ) AS member_fullname,
+		f.name AS facility_name,
+ 		b.memid,
+		CASE WHEN b.memid!=0 THEN membercost*slots
+		ELSE guestcost*slots END AS booking_costs,
+ 		starttime
+FROM Bookings b
+INNER JOIN Members m ON b.memid = m.memid
+INNER JOIN Facilities f ON b.facid = f.facid
+WHERE starttime between '2012-09-14 00:00' and '2012-09-14 11:59') AS bc
+WHERE 1=1
+AND (((booking_costs)>30 AND memid!=0)
+     or((booking_costs)>30 AND memid=0))
+ORDER BY bc.booking_costs DESC
+
+/* Q10: Produce a list of facilities with a total revenue less than 1000.
+The output of facility name and total revenue, sorted by revenue. Remember
+that there's a different cost for guests and members! */
+SELECT facility_name, sum(booking_costs) as total_revenue
+FROM
+(SELECT f.name AS facility_name,
+		CASE WHEN b.memid!=0 THEN membercost*slots
+		ELSE guestcost*slots END AS booking_costs
+	FROM Bookings b
+	INNER JOIN Members m ON b.memid = m.memid
+	INNER JOIN Facilities f ON b.facid = f.facid) AS bc
+GROUP BY 1
+HAVING sum(booking_costs)<1000
+ORDER BY 2 
